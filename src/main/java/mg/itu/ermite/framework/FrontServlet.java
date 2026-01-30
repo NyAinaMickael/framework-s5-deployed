@@ -26,6 +26,26 @@ import mg.itu.ermite.framework.util.EndPointDetails;
 import mg.itu.ermite.framework.util.ModelView;
 import mg.itu.ermite.framework.util.Reflection;
 
+/**
+ * Servlet principale du framework Spring-like qui gère le routage des requêtes HTTP.
+ * 
+ * FrontServlet est un contrôleur frontal (Front Controller pattern) qui :
+ * - Intercepte toutes les requêtes HTTP reçues par l'application
+ * - Identifie l'endpoint correspondant à l'URL et la méthode HTTP
+ * - Extrait les paramètres de l'URL (path variables)
+ * - Invoque la méthode du contrôleur appropriée
+ * - Gère les réponses JSON ou ModelView selon la configuration de la méthode
+ * 
+ * Le routage supporte :
+ * - Les URLs statiques
+ * - Les URLs paramétrées (ex: /user/{id})
+ * - Les requêtes GET, POST et polyvalentes (*)
+ * - Les réponses JSON automatiques (@JsonResponse)
+ * - Les réponses ModelView (Vue + attributs)
+ * 
+ * @author Framework S5
+ * @version 1.0
+ */
 //Ataoko configurable par fichier de configuration ty aveo
 // @MultipartConfig(
 //     maxFileSize = 1024 * 1024 * 10,      // 10MB
@@ -35,12 +55,32 @@ public class FrontServlet extends HttpServlet{
     
     private RequestDispatcher defaultDispatcher ;
 
+    /**
+     * Initialise le servlet en récupérant le dispatcher par défaut du conteneur.
+     * Cette méthode est appelée une fois au démarrage de l'application.
+     * 
+     * @throws ServletException si le dispatcher par défaut ne peut pas être trouvé
+     */
     @Override
     public void init() throws ServletException {
         defaultDispatcher = getServletContext().getNamedDispatcher("default");
         if(defaultDispatcher == null) throw new ServletException("Servlet par defaut introuvable");
     }
 
+    /**
+     * Recherche l'endpoint approprié parmi une liste d'endpoints pour une méthode HTTP donnée.
+     * 
+     * La recherche suit cet ordre de priorité :
+     * 1. Cherche un endpoint qui correspond exactement à la méthode HTTP spécifiée
+     * 2. Si non trouvé, cherche un endpoint polyvalent (httpMethod = "*")
+     * 3. Lève une exception si aucun endpoint n'est trouvé
+     * 
+     * @param endPointDetails Liste des endpoints disponibles pour l'URL
+     * @param httpMethod Méthode HTTP de la requête (GET, POST, etc.)
+     * @param url URL complète de la requête
+     * @return L'endpoint correspondant
+     * @throws Exception si aucun endpoint n'est trouvé
+     */
     private EndPointDetails findEndPoint(List<EndPointDetails> endPointDetails,String httpMethod,String url) throws Exception
     {
         EndPointDetails matchedEndPoint = null;
@@ -71,6 +111,26 @@ public class FrontServlet extends HttpServlet{
         return matchedEndPoint;
     }
 
+    /**
+     * Traite chaque requête HTTP reçue par le servlet.
+     * 
+     * Processus de traitement :
+     * 1. Vérifie si la ressource est statique (fichier réel)
+     * 2. Si oui, la sert via le dispatcher par défaut
+     * 3. Si non, cherche l'endpoint correspondant à l'URL
+     * 4. Extrait les paramètres de l'URL (path variables)
+     * 5. Invoque la méthode du contrôleur
+     * 6. Formate la réponse :
+     *    - JSON si @JsonResponse est présent
+     *    - ModelView avec JSP si la méthode retourne ModelView
+     *    - Texte brut si la méthode retourne String
+     * 7. En cas d'erreur, affiche une page HTML avec le message d'erreur
+     * 
+     * @param request La requête HTTP
+     * @param response L'objet de réponse HTTP
+     * @throws ServletException en cas d'erreur de servlet
+     * @throws IOException en cas d'erreur d'entrée/sortie
+     */
     @Override
     protected void service(HttpServletRequest request, HttpServletResponse response) 
             throws ServletException, IOException {

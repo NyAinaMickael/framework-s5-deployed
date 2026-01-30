@@ -25,21 +25,81 @@ import jakarta.servlet.http.Part;
 import mg.itu.ermite.framework.annotation.RequestParam;
 import mg.itu.ermite.framework.util.security.SecurityHandler;
 
+/**
+ * Classe contenant les détails d'un endpoint et gérant l'invocation de méthode.
+ * 
+ * EndPointDetails encapsule toutes les informations concernant un endpoint :
+ * - La classe du contrôleur
+ * - La méthode à invoquer
+ * - La méthode HTTP (GET, POST, *)
+ * 
+ * Responsabilités principales :
+ * 1. Invoquer la méthode du contrôleur avec les paramètres appropriés
+ * 2. Binder (lier) les paramètres de la requête HTTP aux paramètres de la méthode
+ * 3. Convertir les types (String => int, Date, etc.)
+ * 4. Construire les objets complexes à partir des paramètres HTTP
+ * 5. Gérer les collections et tableaux de paramètres
+ * 6. Gérer l'upload de fichiers (Map<String, List<FileData>>)
+ * 7. Appliquer les contrôles de sécurité
+ * 
+ * Le binding supporte :
+ * - Les types primitifs (int, String, boolean, double, etc.)
+ * - Les objets POJOs (Plain Old Java Objects)
+ * - Les collections (List<T>)
+ * - Les tableaux (T[])
+ * - Les types génériques (List<T>, Map<String, T>, etc.)
+ * - Les fichiers uploadés (FileData)
+ * - La session HTTP (SessionMap)
+ * - Les paramètres URL (path variables)
+ * 
+ * @author Framework S5
+ * @version 1.0
+ * @see FrontServlet
+ * @see ClasspathScanner
+ * @see Reflection
+ */
 public class EndPointDetails {
     private String className;
     private Method method;
     private String httpMethod;
     
+    /**
+     * Constructeur par défaut.
+     */
     public EndPointDetails() {
     }
 
+    /**
+     * Constructeur avec classe et méthode.
+     * 
+     * @param className le nom qualifié de la classe du contrôleur
+     * @param method la méthode à invoquer
+     */
     public EndPointDetails(String className, Method method) {
         this.className = className;
         this.method = method;
     }
 
-    /*
-     * Permet d'appeler la fonction correspondant aux informations de l'instance actuelle.
+    /**
+     * Invoque la méthode du contrôleur avec les paramètres extraits de la requête.
+     * 
+     * Processus d'invocation :
+     * 1. Vérifie les permissions de sécurité
+     * 2. Crée une instance du contrôleur
+     * 3. Récupère les paramètres de la méthode
+     * 4. Pour chaque paramètre :
+     *    - Si c'est Map<String, Object> : ajoute tous les paramètres HTTP
+     *    - Si c'est Map<String, List<FileData>> : ajoute les fichiers uploadés
+     *    - Si c'est SessionMap : passe la session
+     *    - Si c'est primitif : convertit le String en type cible
+     *    - Si c'est un objet complexe : effectue un binding récursif
+     * 5. Invoque la méthode avec les paramètres préparés
+     * 6. Retourne le résultat ou propage l'exception
+     * 
+     * @param request la requête HTTP
+     * @param urlParams map des paramètres extraits de l'URL (path variables)
+     * @return le résultat de l'invocation de la méthode
+     * @throws RuntimeException en cas d'erreur d'invocation ou de binding
      */
     public Object invokeMethod(HttpServletRequest request,Map<String,String> urlParams) {
         try {
@@ -179,6 +239,17 @@ public class EndPointDetails {
         }
     }
 
+    /**
+     * Récupère l'index maximum d'un paramètre de tableau dans la requête.
+     * 
+     * Utilisé pour déterminer la taille des tableaux lors du binding.
+     * Exemple : Si les paramètres sont "items[0]", "items[1]", "items[2]",
+     * retourne 2 (l'index maximal).
+     * 
+     * @param request la requête HTTP
+     * @param argumentName le nom du paramètre de tableau
+     * @return l'index maximal trouvé ou null s'il n'y en a pas
+     */
     private Integer getMaxArrayIndex(HttpServletRequest request, String argumentName) {
         int maxIndex = -1;
         Enumeration<String> paramNames = request.getParameterNames();
@@ -197,8 +268,22 @@ public class EndPointDetails {
         return maxIndex >= 0 ? maxIndex : null;
     }
 
-    /*
-     * Cette methode sert a la creation d'une entite non primitive a partir de donnees passes via une requete http
+    /**
+     * Effectue le binding (liaison) entre les données de requête HTTP et les objets Java.
+     * 
+     * Cette méthode est la clé du framework, elle transforme les paramètres HTTP
+     * en objets Java typés. Elle gère :
+     * - Les types primitifs (conversion String => type)
+     * - Les types complexes (binding récursif de propriétés)
+     * - Les collections (List<T>)
+     * - Les tableaux (T[])
+     * - Les types génériques
+     * 
+     * @param request la requête HTTP
+     * @param objectType le type cible (peut être générique)
+     * @param argumentName le nom du paramètre HTTP ou le préfixe pour les objets imbriqués
+     * @return l'objet bindé du type spécifié
+     * @throws Exception en cas d'erreur de binding
      */
     private <T> T bindObject(HttpServletRequest request,
                          Type objectType,
@@ -253,6 +338,15 @@ public class EndPointDetails {
         }
     }
 
+    /**
+     * Effectue le binding d'un tableau générique (T[]).
+     * 
+     * @param request la requête HTTP
+     * @param component le type des éléments du tableau
+     * @param argumentName le nom du paramètre HTTP
+     * @return le tableau bindé
+     * @throws Exception en cas d'erreur
+     */
     private <T> T bindGenericArray(HttpServletRequest request, Type component, String argumentName) throws Exception {
         Integer maxIndex = getMaxArrayIndex(request, argumentName);
 
@@ -271,8 +365,18 @@ public class EndPointDetails {
         return (T) array;
     }
 
-
-    private <T> T bindArray(HttpServletRequest request,
+    /**
+     * Effectue le binding d'un tableau typé (par exemple int[], String[]).
+     * 
+     * Gère les paramètres HTTP de la forme : paramName[0], paramName[1], etc.
+     * Construït dynamiquement un tableau des éléments bindés.
+     * 
+     * @param request la requête HTTP
+     * @param arrayType le type du tableau
+     * @param argumentName le nom du paramètre HTTP
+     * @return le tableau bindé
+     * @throws Exception en cas d'erreur
+     */    private <T> T bindArray(HttpServletRequest request,
                             Type arrayType,
                             String argumentName) throws Exception 
     {
@@ -308,6 +412,18 @@ public class EndPointDetails {
     }
 
 
+    /**
+     * Effectue le binding d'une collection générique (List<T>, Set<T>, etc.).
+     * 
+     * Gère les paramètres HTTP de la forme : paramName[0], paramName[1], etc.
+     * Construit une liste contenant les éléments bindés du type générique.
+     * 
+     * @param request la requête HTTP
+     * @param collectionType le type générique de la collection
+     * @param argumentName le nom du paramètre HTTP
+     * @return la collection bindée
+     * @throws Exception en cas d'erreur
+     */
     private <T> Collection<T> bindCollection(HttpServletRequest request, Type collectionType, String argumentName) throws Exception {
         Type elementType = ((ParameterizedType) collectionType).getActualTypeArguments()[0];
         Collection<T> result = new ArrayList<>();
@@ -327,6 +443,25 @@ public class EndPointDetails {
     }
 
 
+    /**
+     * Effectue le binding d'un objet métier (POJO - Plain Old Java Object).
+     * 
+     * Pour chaque propriété de la classe :
+     * 1. Cherche un paramètre HTTP correspondant (prefix.propertyName)
+     * 2. Effectue un binding récursif pour les propriétés imbriquées
+     * 3. Utilise le setter pour affecter la valeur
+     * 
+     * Exemple : Pour un objet User avec propriété "address" de type Address,
+     * les paramètres HTTP seraient :
+     * - address.street=Rue de la Paix
+     * - address.city=Paris
+     * 
+     * @param request la requête HTTP
+     * @param objectType le type de l'objet à binder
+     * @param prefix le préfixe du paramètre HTTP
+     * @return l'objet bindé
+     * @throws Exception en cas d'erreur
+     */
     //mba mampiasa terme technique kely,haha :bind old java object
     private <T> T bindPojo(HttpServletRequest request,
                        Type objectType,
@@ -368,29 +503,67 @@ public class EndPointDetails {
         return instance;
     }
 
+    /**
+     * Récupère le nom qualifié de la classe du contrôleur.
+     * 
+     * @return le nom complet de la classe (package.NomClasse)
+     */
     public String getClassName() {
         return className;
     }
+    
+    /**
+     * Définit le nom qualifié de la classe du contrôleur.
+     * 
+     * @param className le nom complet de la classe
+     */
     public void setClassName(String className) {
         this.className = className;
     }
     
+    /**
+     * Récupère la méthode associée à cet endpoint.
+     * 
+     * @return l'objet Method représentant la méthode
+     */
     public Method getMethod() {
         return method;
     }
 
+    /**
+     * Définit la méthode associée à cet endpoint.
+     * 
+     * @param method l'objet Method à associer
+     */
     public void setMethod(Method method) {
         this.method = method;
     }
 
+    /**
+     * Récupère la méthode HTTP associée (GET, POST, *).
+     * 
+     * @return la méthode HTTP
+     */
     public String getHttpMethod() {
         return httpMethod;
     }
     
+    /**
+     * Définit la méthode HTTP associée (GET, POST, ou * pour tous).
+     * 
+     * @param httpMethod la méthode HTTP
+     */
     public void setHttpMethod(String httpMethod) {
         this.httpMethod = httpMethod;
     }
     
+    /**
+     * Retourne une représentation textuelle de l'endpoint.
+     * 
+     * Format : Endpoint(HTTP_METHOD:XXX | CLASS:className[METHOD:methodName])
+     * 
+     * @return une chaîne décrivant l'endpoint
+     */
     @Override
     public String toString()
     {

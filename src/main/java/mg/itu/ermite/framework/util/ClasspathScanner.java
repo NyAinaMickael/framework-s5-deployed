@@ -17,16 +17,48 @@ import mg.itu.ermite.framework.annotation.PostMapping;
 import mg.itu.ermite.framework.annotation.UrlMapping;
 
 /**
- * Scanner universel basé sur le ClassLoader.
- * Compatible WAR / JAR / EAR.
+ * Scanner de classpath qui découvre automatiquement les contrôleurs et endpoints.
+ * 
+ * ClasspathScanner utilise le ClassLoader pour parcourir le classpath et identifier :
+ * 1. Toutes les classes disponibles (compilées et dans les JAR)
+ * 2. Celles annotées avec @Controller
+ * 3. Les méthodes annotées avec @UrlMapping
+ * 4. Les méthodes annotées avec @GetMapping ou @PostMapping
+ * 
+ * Ce scanner est universel et compatible avec :
+ * - Les applications WAR
+ * - Les applications JAR
+ * - Les applications EAR
+ * 
+ * Le scanner parcourt :
+ * - Les classes compilées dans WEB-INF/classes/ (en environnement web)
+ * - Les JAR dans WEB-INF/lib/
+ * 
+ * Résultat : une Map<String, List<EndPointDetails>> où :
+ * - La clé est l'URL mappée (ex: "/users/{id}")
+ * - La valeur est une liste des endpoints (différentes méthodes HTTP sur même URL)
+ * 
+ * @author Framework S5
+ * @version 1.0
+ * @see Controller
+ * @see UrlMapping
+ * @see GetMapping
+ * @see PostMapping
+ * @see EndPointDetails
  */
 public class ClasspathScanner {
 
     /**
-     * Scanne toutes les classes disponibles sur le classpath du chargeur courant
-     * et retourne celles annotées avec une annotation donnée.
+     * Scanne le classpath pour découvrir tous les endpoints annotés.
+     * 
+     * Processus :
+     * 1. Trouve toutes les classes avec @Controller
+     * 2. Pour chaque classe, cherche les méthodes avec @UrlMapping
+     * 3. Identifie la méthode HTTP (GET, POST, ou *)
+     * 4. Enregistre l'endpoint dans la map
+     * 
+     * @return une Map où les clés sont les URLs et les valeurs sont les listes d'EndPointDetails
      */
-
     public static Map<String,Object> findMappedUrls()
     {
         System.out.println("[Framework] Chargement des enpoints...");
@@ -73,6 +105,12 @@ public class ClasspathScanner {
         return mappedEndpoints;
     } 
 
+    /**
+     * Trouve toutes les classes du classpath annotées avec une annotation spécifiée.
+     * 
+     * @param annotation l'annotation à chercher
+     * @return une liste de classes annotées
+     */
     public static List<Class<?>> findAnnotatedClasses(Class<? extends Annotation> annotation) {
         List<Class<?>> annotatedClasses = new ArrayList<>();
         Set<String> allClassNames = new HashSet<>();
@@ -98,7 +136,12 @@ public class ClasspathScanner {
     }
 
     /**
-     * Récupère la liste de tous les noms de classes connus du classpath.
+     * Récupère l'ensemble de tous les noms de classes disponibles sur le classpath.
+     * 
+     * Parcourt les répertoires WEB-INF/classes et les JAR du WEB-INF/lib.
+     * 
+     * @return un ensemble contenant tous les noms de classes
+     * @throws IOException en cas d'erreur lors de la lecture des ressources
      */
     private static Set<String> getAllClassNames() throws IOException {
         Set<String> classNames = new HashSet<>();
@@ -129,7 +172,11 @@ public class ClasspathScanner {
     }
 
     /**
-     * Parcours récursif d’un dossier pour trouver les classes compilées.
+     * Parcourt récursivement un répertoire pour trouver les fichiers .class.
+     * 
+     * @param directory le répertoire à parcourir
+     * @param packageName le nom du package en cours
+     * @param classNames l'ensemble où ajouter les noms de classes trouvées
      */
     private static void scanDirectory(File directory, String packageName, Set<String> classNames) {
         File[] files = directory.listFiles();
@@ -146,7 +193,10 @@ public class ClasspathScanner {
     }
 
     /**
-     * Parcourt le contenu d’un fichier JAR pour trouver les classes.
+     * Parcourt un fichier JAR pour extraire les noms de classes.
+     * 
+     * @param jarPath le chemin complet du fichier JAR
+     * @param classNames l'ensemble où ajouter les noms de classes trouvées
      */
     private static void scanJarFile(String jarPath, Set<String> classNames) {
         System.out.println("- Lecture du JAR : " + jarPath);

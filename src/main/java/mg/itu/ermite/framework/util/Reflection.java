@@ -4,9 +4,44 @@ import java.lang.reflect.Array;
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.lang.reflect.Type;
 import java.util.Collection;
 
+/**
+ * Classe utilitaire fournissant des méthodes de réflexion pour le framework.
+ * 
+ * Reflection offre des fonctionnalités essentielles pour :
+ * - La conversion de types (String vers int, boolean, double, etc.)
+ * - L'identification des types primitifs et simples
+ * - La détection des collections et types génériques
+ * - L'obtention de valeurs par défaut pour les types
+ * 
+ * Ces méthodes sont utilisées par :
+ * - EndPointDetails pour binder les paramètres de requête
+ * - FrontServlet pour traiter les réponses
+ * - L'injection de dépendances et le data binding
+ * 
+ * @author Framework S5
+ * @version 1.0
+ * @see EndPointDetails
+ * @see FrontServlet
+ */
 public class Reflection {
+    
+    /**
+     * Convertit une valeur String vers le type cible spécifié.
+     * 
+     * Supporte les conversions vers :
+     * - String
+     * - Types numériques primitifs et wrappers (int, Integer, float, Float, etc.)
+     * - Types booléens (boolean, Boolean)
+     * - Et potentiellement d'autres types...
+     * 
+     * @param value la chaîne de caractères à convertir
+     * @param targetType le type cible
+     * @return la valeur convertie
+     * @throws IllegalArgumentException si le type n'est pas supporté
+     */
     public static Object convertType(String value, Class<?> targetType) {
         if (targetType == String.class) return value;
         if (targetType == int.class || targetType == Integer.class) return (int) Integer.parseInt(value);
@@ -17,6 +52,24 @@ public class Reflection {
         throw new IllegalArgumentException("Parametre non pris en compte: " + targetType);
     }
 
+    /**
+     * Vérifie si un type est un type "primitif" au sens du framework.
+     * 
+     * Les types primitifs incluent :
+     * - Types Java primitifs (int, boolean, double, etc.)
+     * - String
+     * - Enums
+     * - UUID
+     * - Wrappers numériques (Integer, Long, Double, Boolean, etc.)
+     * - Grands nombres (BigDecimal, BigInteger)
+     * - Types date/heure (LocalDate, Date, Timestamp, etc.)
+     * 
+     * Ces types sont considérés comme "simples" et peuvent être convertis
+     * directement à partir de String lors du binding des paramètres HTTP.
+     * 
+     * @param clazz la classe à vérifier
+     * @return true si c'est un type primitif au sens du framework
+     */
     public static boolean isPrimitiveType(Class<?> clazz) {
         if (clazz == null) {
             return false;
@@ -56,6 +109,18 @@ public class Reflection {
         return false;
     }
 
+    /**
+     * Détermine si un type est une collection (List, Set, Collection, etc.).
+     * 
+     * Supporte les collections génériques paramétrées :
+     * - List<T>
+     * - Set<T>
+     * - Collection<T>
+     * - Et autres implémentations de Collection
+     * 
+     * @param type le type à vérifier (peut être un Type générique)
+     * @return true si c'est un type collection
+     */
     public static boolean isCollectionType(Type type) {
         if (type instanceof ParameterizedType) {
             Type raw = ((ParameterizedType) type).getRawType();
@@ -66,6 +131,19 @@ public class Reflection {
         }
         return false;
     }
+    
+    /**
+     * Résout un Type générique et retourne la Class correspondante.
+     * 
+     * Supporte :
+     * - Les classes simples (Class<T>)
+     * - Les types génériques paramétrés (ParameterizedType)
+     * - Les types de tableaux génériques (GenericArrayType)
+     * 
+     * @param t le type générique à résoudre
+     * @return la Class résolue
+     * @throws IllegalArgumentException si le type ne peut pas être résolu
+     */
     public static Class<?> resolveClass(Type t) {
         if (t instanceof Class) return (Class<?>) t;
         if (t instanceof GenericArrayType)
@@ -75,6 +153,19 @@ public class Reflection {
         throw new IllegalArgumentException("Type non résoluble: " + t);
     }
 
+    /**
+     * Retourne la valeur par défaut pour un type donné.
+     * 
+     * Comportement :
+     * - Pour les primitifs : false, 0, 0L, 0.0, etc.
+     * - Pour les wrappers et objets : null
+     * - Pour void : null
+     * 
+     * Utilisé lors du binding pour initialiser les paramètres non fournis.
+     * 
+     * @param clazz le type pour lequel obtenir la valeur par défaut
+     * @return la valeur par défaut du type
+     */
     public static <T> T getDefaultValue(Class<T> clazz) {
         if (clazz == null) {
             return null;
