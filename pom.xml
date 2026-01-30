@@ -8,19 +8,8 @@
     
     <groupId>mg.itu.ermite</groupId>
     <artifactId>framework</artifactId>
-    <name>framework</name>
     <version>1.0.0</version>
     <packaging>jar</packaging>
-    <description>Academic Java Web Framework</description>
-    <url>https://github.com/NyAinaMickael/framework-s5</url>
-
-    <distributionManagement>
-        <repository>
-            <id>github</id>
-            <name>GitHub Packages</name>
-            <url>https://maven.pkg.github.com/NyAinaMickael/framework-s5</url>
-        </repository>
-    </distributionManagement>
     
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
