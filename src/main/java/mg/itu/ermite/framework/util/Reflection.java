@@ -33,23 +33,65 @@ public class Reflection {
      * 
      * Supporte les conversions vers :
      * - String
-     * - Types numériques primitifs et wrappers (int, Integer, float, Float, etc.)
+     * - Types numériques primitifs et wrappers (int, Integer, float, Float, long, Long, etc.)
      * - Types booléens (boolean, Boolean)
-     * - Et potentiellement d'autres types...
+     * - Grands nombres (BigDecimal, BigInteger)
+     * - UUID
+     * - Types date/heure (LocalDate, LocalDateTime, LocalTime, Date, Timestamp, etc.)
      * 
      * @param value la chaîne de caractères à convertir
      * @param targetType le type cible
      * @return la valeur convertie
-     * @throws IllegalArgumentException si le type n'est pas supporté
+     * @throws IllegalArgumentException si le type n'est pas supporté ou si la conversion échoue
      */
     public static Object convertType(String value, Class<?> targetType) {
+        // Types simples
         if (targetType == String.class) return value;
-        if (targetType == int.class || targetType == Integer.class) return (int) Integer.parseInt(value);
-        if (targetType == float.class || targetType == Float.class) return (float) Float.parseFloat(value);
-        if (targetType == double.class || targetType == Double.class) return (double) Double.parseDouble(value);
-        if (targetType == boolean.class || targetType == Boolean.class) return (boolean) Boolean.parseBoolean(value);
-        // ... autres conversions
-        throw new IllegalArgumentException("Parametre non pris en compte: " + targetType);
+        if (targetType == int.class || targetType == Integer.class) return Integer.parseInt(value);
+        if (targetType == long.class || targetType == Long.class) return Long.parseLong(value);
+        if (targetType == float.class || targetType == Float.class) return Float.parseFloat(value);
+        if (targetType == double.class || targetType == Double.class) return Double.parseDouble(value);
+        if (targetType == boolean.class || targetType == Boolean.class) return Boolean.parseBoolean(value);
+        if (targetType == byte.class || targetType == Byte.class) return Byte.parseByte(value);
+        if (targetType == short.class || targetType == Short.class) return Short.parseShort(value);
+        
+        // Grands nombres
+        if (targetType == java.math.BigDecimal.class) return new java.math.BigDecimal(value);
+        if (targetType == java.math.BigInteger.class) return new java.math.BigInteger(value);
+        
+        // UUID
+        if (targetType == java.util.UUID.class) return java.util.UUID.fromString(value);
+        
+        // Types date/heure java.time
+        if (targetType == java.time.LocalDate.class) return java.time.LocalDate.parse(value);
+        if (targetType == java.time.LocalDateTime.class) return java.time.LocalDateTime.parse(value);
+        if (targetType == java.time.LocalTime.class) return java.time.LocalTime.parse(value);
+        if (targetType == java.time.YearMonth.class) return java.time.YearMonth.parse(value);
+        if (targetType == java.time.MonthDay.class) return java.time.MonthDay.parse(value);
+        if (targetType == java.time.Year.class) return java.time.Year.parse(value);
+        if (targetType == java.time.ZonedDateTime.class) return java.time.ZonedDateTime.parse(value);
+        if (targetType == java.time.OffsetDateTime.class) return java.time.OffsetDateTime.parse(value);
+        if (targetType == java.time.OffsetTime.class) return java.time.OffsetTime.parse(value);
+        if (targetType == java.time.Instant.class) return java.time.Instant.parse(value);
+        
+        // Types date/heure legacy
+        if (targetType == java.util.Date.class) {
+            try {
+                return new java.util.Date(java.sql.Date.valueOf(value).getTime());
+            } catch (IllegalArgumentException e) {
+                // Essayer avec un format ISO
+                try {
+                    return java.sql.Timestamp.valueOf(value);
+                } catch (IllegalArgumentException e2) {
+                    throw new IllegalArgumentException("Impossible de convertir '" + value + "' en Date", e2);
+                }
+            }
+        }
+        if (targetType == java.sql.Date.class) return java.sql.Date.valueOf(value);
+        if (targetType == java.sql.Timestamp.class) return java.sql.Timestamp.valueOf(value);
+        if (targetType == java.sql.Time.class) return java.sql.Time.valueOf(value);
+        
+        throw new IllegalArgumentException("Type non supporté: " + targetType);
     }
 
     /**
